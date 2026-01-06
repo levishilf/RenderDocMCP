@@ -108,6 +108,35 @@ def get_texture_info(resource_id: str) -> dict:
 
 
 @mcp.tool
+def get_texture_data(
+    resource_id: str,
+    mip: int = 0,
+    slice: int = 0,
+    sample: int = 0,
+    depth_slice: int | None = None,
+) -> dict:
+    """
+    Read the pixel data of a texture resource.
+
+    Args:
+        resource_id: The resource ID of the texture to read
+        mip: Mip level to retrieve (default: 0)
+        slice: Array slice or cube face index (default: 0)
+               For cube maps: 0=X+, 1=X-, 2=Y+, 3=Y-, 4=Z+, 5=Z-
+        sample: MSAA sample index (default: 0)
+        depth_slice: For 3D textures only, extract a specific depth slice (default: None = full volume)
+                     When specified, returns only the 2D slice at that depth index
+
+    Returns texture pixel data as base64-encoded bytes along with metadata
+    including dimensions at the requested mip level and format information.
+    """
+    params = {"resource_id": resource_id, "mip": mip, "slice": slice, "sample": sample}
+    if depth_slice is not None:
+        params["depth_slice"] = depth_slice
+    return bridge.call("get_texture_data", params)
+
+
+@mcp.tool
 def get_pipeline_state(event_id: int) -> dict:
     """
     Get the full graphics pipeline state at a specific event.

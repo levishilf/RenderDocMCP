@@ -89,6 +89,7 @@ uv tool update-shell  # PATHに追加
 | `get_shader_info` | シェーダーのソースコード・定数バッファの値を取得 |
 | `get_buffer_contents` | バッファの内容を取得 (Base64) |
 | `get_texture_info` | テクスチャのメタデータを取得 |
+| `get_texture_data` | テクスチャのピクセルデータを取得 (Base64) |
 | `get_pipeline_state` | パイプライン状態を取得 |
 
 ## 使用例
@@ -109,6 +110,32 @@ get_shader_info(event_id=123, stage="pixel")
 
 ```
 get_pipeline_state(event_id=123)
+```
+
+### テクスチャデータの取得
+
+```
+# 2Dテクスチャのmip 0を取得
+get_texture_data(resource_id="ResourceId::123")
+
+# 特定のmipレベルを取得
+get_texture_data(resource_id="ResourceId::123", mip=2)
+
+# キューブマップの特定の面を取得 (0=X+, 1=X-, 2=Y+, 3=Y-, 4=Z+, 5=Z-)
+get_texture_data(resource_id="ResourceId::456", slice=3)
+
+# 3Dテクスチャの特定の深度スライスを取得
+get_texture_data(resource_id="ResourceId::789", depth_slice=5)
+```
+
+### バッファデータの部分取得
+
+```
+# バッファ全体を取得
+get_buffer_contents(resource_id="ResourceId::123")
+
+# オフセット256から512バイト取得
+get_buffer_contents(resource_id="ResourceId::123", offset=256, length=512)
 ```
 
 ## 要件

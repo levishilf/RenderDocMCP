@@ -45,8 +45,9 @@ RenderDocMCP/
 | `get_draw_calls` | ドローコール一覧（階層構造） |
 | `get_draw_call_details` | 特定ドローコールの詳細 |
 | `get_shader_info` | シェーダーソース/定数バッファ |
-| `get_buffer_contents` | バッファデータ取得 |
+| `get_buffer_contents` | バッファデータ取得（オフセット/長さ指定可） |
 | `get_texture_info` | テクスチャメタデータ |
+| `get_texture_data` | テクスチャピクセルデータ取得（mip/slice/3Dスライス対応） |
 | `get_pipeline_state` | パイプライン状態全体 |
 
 ## 通信プロトコル

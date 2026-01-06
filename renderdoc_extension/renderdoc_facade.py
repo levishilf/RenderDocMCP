@@ -252,6 +252,140 @@ class RenderDocFacade:
             raise ValueError(result["error"])
         return result["texture"]
 
+    def get_texture_data(self, resource_id, mip=0, slice=0, sample=0, depth_slice=None):
+        """
+        Get texture pixel data.
+
+        Args:
+            resource_id: Resource ID of the texture
+            mip: Mip level to retrieve (default: 0)
+            slice: Array slice or cube face (default: 0)
+                   Note: For 3D textures, slice is ignored by RenderDoc API
+            sample: MSAA sample index (default: 0)
+            depth_slice: For 3D textures, extract a specific depth slice (default: None = full volume)
+                         When specified, returns only the 2D slice at that depth index
+
+        Returns:
+            dict with texture metadata and base64-encoded pixel data
+        """
+        if not self.ctx.IsCaptureLoaded():
+            raise ValueError("No capture loaded")
+
+        result = {"data": None, "error": None}
+
+        def callback(controller):
+            try:
+                rid = self._parse_resource_id(resource_id)
+            except Exception:
+                result["error"] = "Invalid resource ID: %s" % resource_id
+                return
+
+            # Find texture to get metadata
+            tex_desc = None
+            for tex in controller.GetTextures():
+                if tex.resourceId == rid:
+                    tex_desc = tex
+                    break
+
+            if not tex_desc:
+                result["error"] = "Texture not found: %s" % resource_id
+                return
+
+            # Validate mip level
+            if mip < 0 or mip >= tex_desc.mips:
+                result["error"] = "Invalid mip level %d (texture has %d mips)" % (
+                    mip,
+                    tex_desc.mips,
+                )
+                return
+
+            # Validate slice for array/cube textures
+            max_slices = tex_desc.arraysize
+            if tex_desc.cubemap:
+                max_slices = tex_desc.arraysize * 6  # 6 faces per cube
+            if slice < 0 or (max_slices > 1 and slice >= max_slices):
+                result["error"] = "Invalid slice %d (texture has %d slices)" % (
+                    slice,
+                    max_slices,
+                )
+                return
+
+            # Validate sample for MSAA
+            if sample < 0 or (tex_desc.msSamp > 1 and sample >= tex_desc.msSamp):
+                result["error"] = "Invalid sample %d (texture has %d samples)" % (
+                    sample,
+                    tex_desc.msSamp,
+                )
+                return
+
+            # Calculate dimensions at this mip level
+            mip_width = max(1, tex_desc.width >> mip)
+            mip_height = max(1, tex_desc.height >> mip)
+            mip_depth = max(1, tex_desc.depth >> mip)
+
+            # Validate depth_slice for 3D textures
+            is_3d = tex_desc.depth > 1
+            if depth_slice is not None:
+                if not is_3d:
+                    result["error"] = "depth_slice can only be used with 3D textures"
+                    return
+                if depth_slice < 0 or depth_slice >= mip_depth:
+                    result["error"] = "Invalid depth_slice %d (texture has %d depth at mip %d)" % (
+                        depth_slice,
+                        mip_depth,
+                        mip,
+                    )
+                    return
+
+            # Create subresource specification
+            sub = rd.Subresource()
+            sub.mip = mip
+            sub.slice = slice
+            sub.sample = sample
+
+            # Get texture data
+            try:
+                data = controller.GetTextureData(rid, sub)
+            except Exception as e:
+                result["error"] = "Failed to get texture data: %s" % str(e)
+                return
+
+            # Extract depth slice for 3D textures if requested
+            output_depth = mip_depth
+            if is_3d and depth_slice is not None:
+                # Calculate bytes per slice (width * height * bytes_per_pixel)
+                total_size = len(data)
+                bytes_per_slice = total_size // mip_depth
+
+                # Extract the requested slice
+                slice_start = depth_slice * bytes_per_slice
+                slice_end = slice_start + bytes_per_slice
+                data = data[slice_start:slice_end]
+                output_depth = 1
+
+            result["data"] = {
+                "resource_id": resource_id,
+                "width": mip_width,
+                "height": mip_height,
+                "depth": output_depth,
+                "mip": mip,
+                "slice": slice,
+                "sample": sample,
+                "depth_slice": depth_slice,
+                "format": str(tex_desc.format.Name()),
+                "dimension": str(tex_desc.type),
+                "is_3d": is_3d,
+                "total_depth": mip_depth if is_3d else 1,
+                "data_length": len(data),
+                "content_base64": base64.b64encode(data).decode("ascii"),
+            }
+
+        self._invoke(callback)
+
+        if result["error"]:
+            raise ValueError(result["error"])
+        return result["data"]
+
     def get_pipeline_state(self, event_id):
         """Get full pipeline state at an event"""
         if not self.ctx.IsCaptureLoaded():

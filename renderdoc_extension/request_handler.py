@@ -19,6 +19,7 @@ class RequestHandler:
             "get_shader_info": self._handle_get_shader_info,
             "get_buffer_contents": self._handle_get_buffer_contents,
             "get_texture_info": self._handle_get_texture_info,
+            "get_texture_data": self._handle_get_texture_data,
             "get_pipeline_state": self._handle_get_pipeline_state,
         }
 
@@ -92,6 +93,17 @@ class RequestHandler:
         if resource_id is None:
             raise ValueError("resource_id is required")
         return self.facade.get_texture_info(resource_id)
+
+    def _handle_get_texture_data(self, params):
+        """Handle get_texture_data request"""
+        resource_id = params.get("resource_id")
+        if resource_id is None:
+            raise ValueError("resource_id is required")
+        mip = params.get("mip", 0)
+        slice_idx = params.get("slice", 0)
+        sample = params.get("sample", 0)
+        depth_slice = params.get("depth_slice")  # None = full volume
+        return self.facade.get_texture_data(resource_id, mip, slice_idx, sample, depth_slice)
 
     def _handle_get_pipeline_state(self, params):
         """Handle get_pipeline_state request"""
