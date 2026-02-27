@@ -1,40 +1,40 @@
-# RenderDoc MCP 改善提案
+# RenderDoc MCP 改进提案
 
 ## 背景
 
-UnityプロジェクトでRenderDocキャプチャを分析する際、以下の課題がある：
+在 Unity 项目中分析 RenderDoc 捕获时，存在以下问题：
 
-1. **UIノイズ問題**: Unity Editorからキャプチャすると、`GUI.Repaint`や`UIR.DrawChain`などのEditor UI描画が大量に含まれ、実際のゲーム描画（`Camera.Render`配下）を探すのが困難
-2. **レスポンスサイズ問題**: `get_draw_calls(include_children=true)`の結果が70KB超になり、LLMのコンテキストを圧迫
-3. **探索の非効率性**: 特定のシェーダーやテクスチャを使用しているドローコールを見つけるのに、全ドローコールを1つずつ確認する必要がある
+1. **UI 噪声问题**：从 Unity Editor 捕获时，会包含大量 `GUI.Repaint` 和 `UIR.DrawChain` 等 Editor UI 绘制，导致难以找到实际的游戏绘制（`Camera.Render` 下）
+2. **响应大小问题**：`get_draw_calls(include_children=true)` 的结果超过 70KB，对 LLM 上下文造成压力
+3. **搜索低效问题**：要找到使用特定着色器或纹理的 Draw Call，需要逐一检查所有 Draw Call
 
-## 改善提案
+## 改进提案
 
-### 1. マーカーフィルタリング（優先度: 高）
+### 1. 标记过滤（优先级：高）
 
-特定のマーカー配下のみ、または特定のマーカーを除外して取得する機能。
+仅获取特定标记下的内容，或排除特定标记的功能。
 
 ```python
 get_draw_calls(
     include_children=True,
-    marker_filter="Camera.Render",  # このマーカー配下のみ取得
+    marker_filter="Camera.Render",  # 仅获取此标记下的内容
     exclude_markers=["GUI.Repaint", "UIR.DrawChain", "UGUI.Rendering"]
 )
 ```
 
-**ユースケース**:
-- Unity Editorキャプチャからゲーム描画のみを抽出
-- 特定のレンダリングパス（Shadows, PostProcess等）のみを調査
+**用例**：
+- 从 Unity Editor 捕获中仅提取游戏绘制
+- 仅调查特定渲染通道（Shadows、PostProcess 等）
 
-**期待される効果**:
-- レスポンスサイズを10-20%に削減
-- LLMが直接解析可能なサイズに収まる
+**预期效果**：
+- 将响应大小缩减至 10-20%
+- 控制在 LLM 可直接解析的大小范围内
 
 ---
 
-### 2. event_id範囲指定（優先度: 高）
+### 2. event_id 范围指定（优先级：高）
 
-特定のevent_id範囲のみを取得する機能。
+仅获取特定 event_id 范围的功能。
 
 ```python
 get_draw_calls(
@@ -44,32 +44,32 @@ get_draw_calls(
 )
 ```
 
-**ユースケース**:
-- `Camera.Render`のevent_idが判明している場合、その周辺のみを取得
-- 問題のあるドローコール周辺を詳細に調査
+**用例**：
+- 当已知 `Camera.Render` 的 event_id 时，仅获取其周围内容
+- 详细调查有问题的 Draw Call 周围
 
-**期待される効果**:
-- 必要な部分だけを高速に取得
-- 段階的な探索が可能に
+**预期效果**：
+- 仅快速获取所需部分
+- 支持逐步探索
 
 ---
 
-### 3. シェーダー/テクスチャ/リソースによる逆引き検索（優先度: 中）
+### 3. 通过着色器/纹理/资源反向搜索（优先级：中）
 
-特定のリソースを使用しているドローコールを検索する機能。
+搜索使用特定资源的 Draw Call 的功能。
 
 ```python
-# シェーダー名で検索（部分一致）
+# 按着色器名称搜索（部分匹配）
 find_draws_by_shader(shader_name="Toon")
 
-# テクスチャ名で検索（部分一致）
+# 按纹理名称搜索（部分匹配）
 find_draws_by_texture(texture_name="CharacterSkin")
 
-# リソースIDで検索（完全一致）
+# 按资源 ID 搜索（精确匹配）
 find_draws_by_resource(resource_id="ResourceId::12345")
 ```
 
-**返り値例**:
+**返回值示例**：
 ```json
 {
   "matches": [
@@ -80,22 +80,22 @@ find_draws_by_resource(resource_id="ResourceId::12345")
 }
 ```
 
-**ユースケース**:
-- 「このシェーダーを使っているドローはどれ？」という最も一般的な質問に直接回答
-- 特定のテクスチャがどこで使われているか追跡
-- シェーダーバグの影響範囲を特定
+**用例**：
+- 直接回答"哪些 Draw 使用了这个着色器？"这一最常见的问题
+- 追踪特定纹理在哪些地方被使用
+- 确定着色器 Bug 的影响范围
 
 ---
 
-### 4. フレームサマリー取得（優先度: 中）
+### 4. 获取帧摘要（优先级：中）
 
-フレーム全体の概要を取得する機能。
+获取整帧概要信息的功能。
 
 ```python
 get_frame_summary()
 ```
 
-**返り値例**:
+**返回值示例**：
 ```json
 {
   "api": "D3D11",
@@ -124,39 +124,39 @@ get_frame_summary()
 }
 ```
 
-**ユースケース**:
-- 探索の起点として全体像を把握
-- どのマーカー配下を詳しく見るか判断
-- パフォーマンス概要の把握
+**用例**：
+- 作为探索起点把握全局
+- 判断应详细查看哪个标记下的内容
+- 了解性能概况
 
 ---
 
-### 5. ドローコールのみ取得モード（優先度: 中）
+### 5. 仅获取 Draw Call 模式（优先级：中）
 
-マーカー（PushMarker/PopMarker）を除外し、実際の描画コールのみを取得する機能。
+排除标记（PushMarker/PopMarker），仅获取实际绘制调用的功能。
 
 ```python
 get_draw_calls(
-    only_actions=True,  # マーカーを除外
-    flags_filter=["Drawcall", "Dispatch"]  # 特定のフラグを持つもののみ
+    only_actions=True,  # 排除标记
+    flags_filter=["Drawcall", "Dispatch"]  # 仅包含具有特定标志的项
 )
 ```
 
-**ユースケース**:
-- ドローコールの総数と一覧だけ欲しい場合
-- Compute Shader（Dispatch）のみを調査したい場合
+**用例**：
+- 仅需要 Draw Call 的总数和列表时
+- 仅需要调查 Compute Shader（Dispatch）时
 
 ---
 
-### 6. バッチパイプラインステート取得（優先度: 低）
+### 6. 批量获取管线状态（优先级：低）
 
-複数のevent_idのパイプラインステートを一度に取得する機能。
+一次性获取多个 event_id 的管线状态的功能。
 
 ```python
 get_multiple_pipeline_states(event_ids=[7538, 7558, 7450, 7458])
 ```
 
-**返り値例**:
+**返回值示例**：
 ```json
 {
   "states": {
@@ -168,26 +168,26 @@ get_multiple_pipeline_states(event_ids=[7538, 7558, 7450, 7458])
 }
 ```
 
-**ユースケース**:
-- 複数のドローコールを比較分析
-- 差分調査（正常なドローと異常なドローの比較）
+**用例**：
+- 对比分析多个 Draw Call
+- 差异调查（对比正常的 Draw 和异常的 Draw）
 
 ---
 
-## 優先度まとめ
+## 优先级总结
 
-| 優先度 | 機能 | 実装難易度 | 効果 |
+| 优先级 | 功能 | 实现难度 | 效果 |
 |--------|------|-----------|------|
-| **高** | マーカーフィルタリング | 中 | UIノイズ除去で劇的に改善 |
-| **高** | event_id範囲指定 | 低 | 部分取得で高速化 |
-| **中** | シェーダー/テクスチャ逆引き | 高 | 最も多いユースケースを直接サポート |
-| **中** | フレームサマリー | 中 | 探索の起点として有用 |
-| **中** | ドローコールのみ取得 | 低 | シンプルなフィルタリング |
-| **低** | バッチ取得 | 低 | 効率化だが必須ではない |
+| **高** | 标记过滤 | 中 | 去除 UI 噪声后大幅改善 |
+| **高** | event_id 范围指定 | 低 | 部分获取提升速度 |
+| **中** | 着色器/纹理反向搜索 | 高 | 直接支持最常见的用例 |
+| **中** | 帧摘要 | 中 | 作为探索起点很有用 |
+| **中** | 仅获取 Draw Call | 低 | 简单的过滤 |
+| **低** | 批量获取 | 低 | 提高效率但非必须 |
 
-## Unity固有のフィルタリングプリセット（オプション）
+## Unity 特有的过滤预设（可选）
 
-Unity専用のプリセットがあると便利：
+有 Unity 专用预设会很方便：
 
 ```python
 get_draw_calls(
@@ -195,66 +195,66 @@ get_draw_calls(
 )
 ```
 
-**プリセット内容**:
+**预设内容**：
 - `marker_filter`: "Camera.Render"
 - `exclude_markers`: ["GUI.Repaint", "UIR.DrawChain", "GUITexture.Draw", "UGUI.Rendering.RenderOverlays", "PlayerEndOfFrame", "EditorLoop"]
 
 ---
 
-## 実装の参考：現在のワークフローの問題点
+## 实现参考：当前工作流程的问题
 
-### 現状のフロー
+### 当前流程
 
 ```
 1. get_draw_calls(include_children=true)
-   → 76KB のJSONが返る（ファイルに保存される）
+   → 返回 76KB 的 JSON（保存到文件）
 
-2. ファイルを外部ツール（Python等）で解析
-   → Camera.Render の event_id を特定（例: 7372）
+2. 用外部工具（Python 等）解析文件
+   → 确定 Camera.Render 的 event_id（例：7372）
 
-3. 手動でevent_id範囲を指定して詳細調査
+3. 手动指定 event_id 范围进行详细调查
    → get_pipeline_state(7538), get_shader_info(7538, "pixel"), ...
 ```
 
-### 改善後の理想フロー
+### 改进后的理想流程
 
 ```
 1. get_frame_summary()
-   → Camera.Render が event_id: 7372 にあることが分かる
+   → 得知 Camera.Render 在 event_id: 7372
 
 2. get_draw_calls(marker_filter="Camera.Render", exclude_markers=[...])
-   → 必要なドローコールのみ取得（数KB）
+   → 仅获取所需的 Draw Call（几 KB）
 
 3. find_draws_by_shader(shader_name="MyShader")
-   → 該当するevent_idが直接返る
+   → 直接返回匹配的 event_id
 
-4. get_pipeline_state(event_id) で詳細確認
+4. get_pipeline_state(event_id) 查看详细信息
 ```
 
 ---
 
-## 補足：スキップすべきUnityマーカー一覧
+## 补充：应跳过的 Unity 标记列表
 
-Unity Editorからのキャプチャで除外すべきマーカー：
+从 Unity Editor 捕获时应排除的标记：
 
-| マーカー名 | 説明 |
+| 标记名 | 说明 |
 |-----------|------|
-| `GUI.Repaint` | IMGUI描画 |
-| `UIR.DrawChain` | UI Toolkit描画 |
-| `GUITexture.Draw` | GUIテクスチャ描画 |
-| `UGUI.Rendering.RenderOverlays` | uGUIオーバーレイ |
-| `PlayerEndOfFrame` | フレーム終了処理 |
-| `EditorLoop` | エディタループ処理 |
+| `GUI.Repaint` | IMGUI 绘制 |
+| `UIR.DrawChain` | UI Toolkit 绘制 |
+| `GUITexture.Draw` | GUI 纹理绘制 |
+| `UGUI.Rendering.RenderOverlays` | uGUI 覆盖层 |
+| `PlayerEndOfFrame` | 帧结束处理 |
+| `EditorLoop` | 编辑器循环处理 |
 
-逆に、重要なマーカー：
+相反，重要的标记：
 
-| マーカー名 | 説明 |
+| 标记名 | 说明 |
 |-----------|------|
-| `Camera.Render` | メインカメラ描画の起点 |
-| `Drawing` | 描画フェーズ |
-| `Render.OpaqueGeometry` | 不透明オブジェクト描画 |
-| `Render.TransparentGeometry` | 半透明オブジェクト描画 |
-| `RenderForward.RenderLoopJob` | フォワードレンダリングのドローコール群 |
-| `Camera.RenderSkybox` | スカイボックス描画 |
-| `Camera.ImageEffects` | ポストプロセス |
-| `Shadows.RenderShadowMap` | シャドウマップ生成 |
+| `Camera.Render` | 主摄像机绘制的起点 |
+| `Drawing` | 绘制阶段 |
+| `Render.OpaqueGeometry` | 不透明物体绘制 |
+| `Render.TransparentGeometry` | 半透明物体绘制 |
+| `RenderForward.RenderLoopJob` | 前向渲染的 Draw Call 组 |
+| `Camera.RenderSkybox` | 天空盒绘制 |
+| `Camera.ImageEffects` | 后处理 |
+| `Shadows.RenderShadowMap` | 阴影贴图生成 |
