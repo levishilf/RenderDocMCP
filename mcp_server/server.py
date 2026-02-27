@@ -7,6 +7,7 @@ from typing import Literal
 
 from fastmcp import FastMCP
 
+from . import __version__
 from .bridge.client import RenderDocBridge, RenderDocBridgeError
 from .config import settings
 
@@ -17,6 +18,14 @@ mcp = FastMCP(
 
 # RenderDoc bridge client
 bridge = RenderDocBridge(host=settings.renderdoc_host, port=settings.renderdoc_port)
+
+
+@mcp.tool
+def get_version() -> dict:
+    """
+    Get the current version of the RenderDoc MCP server.
+    """
+    return {"version": __version__}
 
 
 @mcp.tool
@@ -87,7 +96,8 @@ def get_frame_summary() -> dict:
 @mcp.tool
 def find_draws_by_shader(
     shader_name: str,
-    stage: Literal["vertex", "hull", "domain", "geometry", "pixel", "compute"] | None = None,
+    stage: Literal["vertex", "hull", "domain", "geometry", "pixel", "compute"]
+    | None = None,
 ) -> dict:
     """
     Find all draw calls using a shader with the given name (partial match).
@@ -313,6 +323,9 @@ def open_capture(capture_path: str) -> dict:
 
 def main():
     """Run the MCP server"""
+    import sys
+
+    print(f"当前 renderdoc-mcp 版本为 {__version__}", file=sys.stderr)
     mcp.run()
 
 
