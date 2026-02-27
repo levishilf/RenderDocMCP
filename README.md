@@ -41,8 +41,14 @@ uv tool update-shell  # 添加到 PATH
 
 重启 Shell 后即可使用 `renderdoc-mcp` 命令。
 
-> **Note**: 添加 `--editable` 可以使源码修改立即生效（开发时很方便）。
+> **Note**: 使用 `uv tool install --editable .` 可以使源码修改立即生效（开发时很方便）。
 > 作为稳定版安装时请使用 `uv tool install .`。
+
+#### 更新MCP
+以CodeBuddy为例
+- 在配置界面-MCP-自定义MCP-renderdoc中：关闭该mcp
+- 运行`uv tool install --editable .`
+- 在配置界面-MCP-自定义MCP-renderdoc中：开启该mcp
 
 ### 4. MCP 客户端配置
 
