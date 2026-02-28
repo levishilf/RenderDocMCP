@@ -3,12 +3,13 @@ RenderDoc MCP Server
 FastMCP 2.0 server providing access to RenderDoc capture data.
 """
 
+from pathlib import Path
 from typing import Literal
 
 from fastmcp import FastMCP
 
 from . import __version__
-from .bridge.client import RenderDocBridge, RenderDocBridgeError
+from .bridge.client import RenderDocBridge
 from .config import settings
 
 # Initialize FastMCP server
@@ -201,9 +202,137 @@ def get_shader_info(
         event_id: The event ID to inspect the shader at
         stage: The shader stage (vertex, hull, domain, geometry, pixel, compute)
 
-    Returns shader disassembly, constant buffer values, and resource bindings.
+    Returns shader disassembly (using the best available readable target),
+    constant buffer values, resource bindings, and the list of available
+    disassembly targets.
     """
     return bridge.call("get_shader_info", {"event_id": event_id, "stage": stage})
+
+
+@mcp.tool
+def get_shader_source(
+    event_id: int,
+    stage: Literal["vertex", "hull", "domain", "geometry", "pixel", "compute"],
+    output_dir: str | None = None,
+    target: str | None = None,
+) -> dict:
+    """
+    Get shader source code by saving it to a local file and returning the file path.
+
+    The shader source is saved to disk so AI clients can read it on demand without
+    the source being truncated in the tool response. This is faster because only
+    file metadata is returned, not the full shader text.
+
+    For mobile captures (Vulkan/OpenGL ES), shaders are typically cross-compiled
+    from SPIR-V back to readable GLSL.
+
+    IMPORTANT for AI clients (VSCode / Rider / Claude):
+    After calling this tool, display a clickable file link in the chat response
+    so users can navigate directly to the shader file. Use the file_path from
+    the result to construct a markdown link, for example:
+      - VSCode:  [shader.glsl](file_path)
+      - Rider:   [shader.glsl](file_path)
+    where file_path uses forward slashes (e.g. C:/path/to/shader.glsl).
+
+    Args:
+        event_id: The event ID to inspect the shader at
+        stage: The shader stage (vertex, hull, domain, geometry, pixel, compute)
+        output_dir: Directory to save the file.
+                    Recommended: use a "renderdoc/<capture_name>" folder under the
+                    AI client's project root.
+                    Defaults to "renderdoc/<capture_name>/" in the current working
+                    directory, where <capture_name> is derived from the currently
+                    loaded RenderDoc capture filename.
+        target: Optional specific disassembly target name (e.g. "GLSL", "SPIR-V").
+                If not specified, automatically picks the most readable target.
+
+    Returns:
+        - file_path: Absolute path to the saved shader file (read it when needed)
+        - file_link: Markdown-formatted clickable link for display in chat
+        - file_size: Size in bytes
+        - line_count: Number of lines in the shader
+        - stage: Shader stage
+        - target: Which disassembly target was used
+        - available_targets: All disassembly targets the shader supports
+        - entry_point: Shader entry point name
+        - resource_id: Shader resource ID
+    """
+    params: dict[str, object] = {"event_id": event_id, "stage": stage}
+    if target is not None:
+        params["target"] = target
+    result = bridge.call("get_shader_source", params)
+
+    source_code = result.get("source_code", "")
+    if not source_code:
+        return {
+            "error": "No shader source code available",
+            "details": result.get("error", "Unknown error"),
+            "available_targets": result.get("available_targets", []),
+        }
+
+    # Determine file extension based on target/encoding
+    used_target = result.get("target", "unknown").lower()
+    if "glsl" in used_target or "embedded" in used_target:
+        ext = ".glsl"
+    elif "hlsl" in used_target:
+        ext = ".hlsl"
+    elif "spir" in used_target:
+        ext = ".spvasm"
+    else:
+        ext = ".txt"
+
+    # Build filename
+    entry_point = result.get("entry_point", "")
+    if entry_point:
+        filename = "shader_eid%d_%s_%s%s" % (event_id, stage, entry_point, ext)
+    else:
+        filename = "shader_eid%d_%s%s" % (event_id, stage, ext)
+
+    # Sanitize filename
+    filename = "".join(c if c.isalnum() or c in "._-" else "_" for c in filename)
+
+    # Determine output directory
+    if output_dir:
+        save_dir = Path(output_dir)
+    else:
+        # Default: renderdoc/<capture_name>/ under current working directory
+        save_dir = Path.cwd() / "renderdoc"
+        try:
+            status = bridge.call("get_capture_status")
+            capture_filename = status.get("filename", "")
+            if capture_filename:
+                capture_name = Path(capture_filename).stem
+                capture_name = "".join(
+                    c if c.isalnum() or c in "._- " else "_" for c in capture_name
+                ).strip()
+                if capture_name:
+                    save_dir = save_dir / capture_name
+        except Exception:
+            pass
+
+    save_dir.mkdir(parents=True, exist_ok=True)
+    file_path = save_dir / filename
+
+    # Write file
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(source_code)
+
+    resolved_path = str(file_path.resolve())
+    # Build a clickable file link for AI chat display (use forward slashes for URI)
+    file_uri = resolved_path.replace("\\", "/")
+    file_link = "[%s](%s)" % (filename, file_uri)
+
+    return {
+        "file_path": resolved_path,
+        "file_link": file_link,
+        "file_size": file_path.stat().st_size,
+        "line_count": source_code.count("\n") + 1,
+        "stage": stage,
+        "target": result.get("target", "unknown"),
+        "available_targets": result.get("available_targets", []),
+        "entry_point": entry_point,
+        "resource_id": result.get("resource_id", ""),
+    }
 
 
 @mcp.tool

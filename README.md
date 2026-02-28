@@ -93,6 +93,7 @@ uv tool update-shell  # 添加到 PATH
 | `get_draw_calls` | 以层级结构获取 Draw Call 列表 |
 | `get_draw_call_details` | 获取特定 Draw Call 的详细信息 |
 | `get_shader_info` | 获取着色器源码和常量缓冲区的值 |
+| `get_shader_source` | 将着色器代码保存为本地文件并返回路径（AI 按需读取，避免截断） |
 | `get_buffer_contents` | 获取缓冲区内容 (Base64) |
 | `get_texture_info` | 获取纹理元数据 |
 | `get_texture_data` | 获取纹理像素数据 (Base64) |
@@ -110,6 +111,19 @@ get_draw_calls(include_children=true)
 
 ```
 get_shader_info(event_id=123, stage="pixel")
+```
+
+### 获取反编译的着色器代码
+
+```
+# 保存着色器到本地文件，返回文件路径（AI 按需读取）
+get_shader_source(event_id=123, stage="pixel")
+
+# 指定反编译目标（如 GLSL、SPIR-V、HLSL）
+get_shader_source(event_id=123, stage="vertex", target="GLSL")
+
+# 保存到指定目录
+get_shader_source(event_id=123, stage="vertex", output_dir="D:/shaders")
 ```
 
 ### 获取管线状态

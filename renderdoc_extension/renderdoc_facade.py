@@ -90,7 +90,9 @@ class RenderDocFacade:
         """Get detailed information about a specific draw call"""
         return self._action.get_draw_call_details(event_id)
 
-    def get_action_timings(self, event_ids=None, marker_filter=None, exclude_markers=None):
+    def get_action_timings(
+        self, event_ids=None, marker_filter=None, exclude_markers=None
+    ):
         """Get GPU timing information for actions"""
         return self._action.get_action_timings(
             event_ids=event_ids,
@@ -124,13 +126,19 @@ class RenderDocFacade:
 
     def get_texture_data(self, resource_id, mip=0, slice=0, sample=0, depth_slice=None):
         """Get texture pixel data"""
-        return self._resource.get_texture_data(resource_id, mip, slice, sample, depth_slice)
+        return self._resource.get_texture_data(
+            resource_id, mip, slice, sample, depth_slice
+        )
 
     # ==================== Pipeline Operations ====================
 
     def get_shader_info(self, event_id, stage):
         """Get shader information for a specific stage"""
         return self._pipeline.get_shader_info(event_id, stage)
+
+    def get_shader_source(self, event_id, stage, target=None):
+        """Get decompiled/disassembled shader source code"""
+        return self._pipeline.get_shader_source(event_id, stage, target)
 
     def get_pipeline_state(self, event_id):
         """Get full pipeline state at an event"""
